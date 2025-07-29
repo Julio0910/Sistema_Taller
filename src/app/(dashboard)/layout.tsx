@@ -1,4 +1,3 @@
-// src/app/(dashboard)/layout.tsx
 "use client"; // Necesario para usar hooks y funciones de cliente
 
 import Link from "next/link";
