@@ -11,8 +11,18 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { PlusCircle, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { cn } from "@/lib/utils"; // Importamos 'cn' para clases condicionales
 
-interface Product { id: string; name: string; sku: string; costPrice: number; salePrice: number; stock: number; }
+// Añadimos el campo minStock a la interfaz
+interface Product {
+  id: string;
+  name: string;
+  sku: string;
+  costPrice: number;
+  salePrice: number;
+  stock: number;
+  minStock: number; // Nuevo campo para el stock mínimo
+}
 
 export default function InventarioPage() {
   const [open, setOpen] = useState(false);
@@ -21,6 +31,7 @@ export default function InventarioPage() {
   const [costo, setCosto] = useState(0);
   const [precio, setPrecio] = useState(0);
   const [stock, setStock] = useState(0);
+  const [minStock, setMinStock] = useState(5); // Nuevo estado para el stock mínimo, con valor por defecto
   const [isSaving, setIsSaving] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -42,15 +53,23 @@ export default function InventarioPage() {
       setCosto(editingProduct.costPrice);
       setPrecio(editingProduct.salePrice);
       setStock(editingProduct.stock);
+      setMinStock(editingProduct.minStock || 5); // Rellenar con el valor guardado o 5 por defecto
     } else {
-      setNombre(""); setSku(""); setCosto(0); setPrecio(0); setStock(0);
+      setNombre(""); setSku(""); setCosto(0); setPrecio(0); setStock(0); setMinStock(5);
     }
   }, [editingProduct]);
 
   const handleSaveProduct = async () => {
     if (!nombre || precio <= 0) return alert("Por favor, llena al menos el nombre y el precio de venta.");
     setIsSaving(true);
-    const productData = { name: nombre, sku: sku, costPrice: Number(costo), salePrice: Number(precio), stock: Number(stock) };
+    const productData = {
+      name: nombre,
+      sku: sku,
+      costPrice: Number(costo),
+      salePrice: Number(precio),
+      stock: Number(stock),
+      minStock: Number(minStock) // Guardar el nuevo campo
+    };
     try {
       if (editingProduct) {
         await updateDoc(doc(db, "products", editingProduct.id), productData);
@@ -110,6 +129,8 @@ export default function InventarioPage() {
               <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="costo" className="text-right">Costo (L)</Label><Input id="costo" type="number" value={costo} onChange={(e) => setCosto(Number(e.target.value))} className="col-span-3"/></div>
               <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="precio" className="text-right">Precio Venta (L)</Label><Input id="precio" type="number" value={precio} onChange={(e) => setPrecio(Number(e.target.value))} className="col-span-3"/></div>
               <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="stock" className="text-right">Stock</Label><Input id="stock" type="number" value={stock} onChange={(e) => setStock(Number(e.target.value))} className="col-span-3"/></div>
+              {/* Nuevo campo en el formulario */}
+              <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="minStock" className="text-right">Stock Mínimo</Label><Input id="minStock" type="number" value={minStock} onChange={(e) => setMinStock(Number(e.target.value))} className="col-span-3"/></div>
             </div>
             <DialogFooter>
               <Button type="submit" onClick={handleSaveProduct} disabled={isSaving}>{isSaving ? "Guardando..." : "Guardar Cambios"}</Button>
@@ -118,7 +139,7 @@ export default function InventarioPage() {
         </Dialog>
       </header>
       <Card>
-        <CardHeader><CardTitle>Lista de Productos</CardTitle><CardDescription>Todos los productos registrados en tu sistema.</CardDescription></CardHeader>
+        <CardHeader><CardTitle>Lista de Productos</CardTitle><CardDescription>Los productos con bajo stock se resaltan en rojo.</CardDescription></CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
@@ -129,13 +150,15 @@ export default function InventarioPage() {
             <TableBody>
               {products.length > 0 ? (
                 products.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.sku || 'N/A'}</TableCell><TableCell>{product.name}</TableCell><TableCell className="text-right">{product.salePrice.toFixed(2)}</TableCell><TableCell className="text-right">{product.stock}</TableCell>
+                  // Resaltamos la fila si el stock es bajo
+                  <TableRow key={product.id} className={cn(product.stock <= (product.minStock || 0) && "bg-destructive/10")}>
+                    <TableCell className="font-medium">{product.sku || 'N/A'}</TableCell>
+                    <TableCell>{product.name}</TableCell>
+                    <TableCell className="text-right">{product.salePrice.toFixed(2)}</TableCell>
+                    <TableCell className={cn("text-right font-bold", product.stock <= (product.minStock || 0) && "text-destructive")}>{product.stock}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Abrir menú</span><MoreHorizontal className="h-4 w-4" /></Button>
-                        </DropdownMenuTrigger>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Abrir menú</span><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => handleEditClick(product)}><Pencil className="mr-2 h-4 w-4" /><span>Editar</span></DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDeleteProduct(product.id)} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Eliminar</span></DropdownMenuItem>
@@ -145,9 +168,7 @@ export default function InventarioPage() {
                   </TableRow>
                 ))
               ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">Aún no hay productos. ¡Agrega el primero!</TableCell>
-                </TableRow>
+                <TableRow><TableCell colSpan={5} className="h-24 text-center">Aún no hay productos. ¡Agrega el primero!</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
