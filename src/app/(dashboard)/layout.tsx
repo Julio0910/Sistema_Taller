@@ -38,6 +38,7 @@ export default function DashboardLayout({
               <Link href="/pos" className="hover:text-gray-300">Punto de Venta</Link>
               <Link href="/inventario" className="hover:text-gray-300">Inventario</Link>
               <Link href="/clientes" className="hover:text-gray-300">Clientes</Link>
+                <Link href="/gastos" className="hover:text-gray-300">Gastos</Link>
               {/* El botón solo aparece si hay un usuario logueado */}
               {user && (
                 <Button variant="secondary" onClick={handleLogout}>
